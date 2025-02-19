@@ -54,34 +54,81 @@ class ColdChainService:
         # Gestion des coupures
         # Créer le fichier s'il n'existe pas
         if not os.path.exists('log_coupure.csv'):
-            pd.DataFrame(columns=['coupureID', 'capteurID', 'timestamp_debut', 'timestamp_fin']).to_csv('log_coupure.csv', index=False)
+            pd.DataFrame(columns=[
+                'coupureID', 'capteurID', 'timestamp_debut', 'timestamp_fin',
+                'temperature_coupure_4', 'temperature_coupure_3', 'temperature_coupure_2'
+            ]).to_csv('log_coupure.csv', index=False)
 
         coupures_df = pd.read_csv('log_coupure.csv')
 
-        # Vérifier s'il y a une coupure en cours pour ce capteur
-        coupure_en_cours = coupures_df[
+        # Vérifier les coupures en cours pour ce capteur pour chaque niveau
+        coupures_4 = coupures_df[
             (coupures_df['capteurID'] == captorId) & 
+            (coupures_df['temperature_coupure_4'] == 1) &
+            (coupures_df['timestamp_fin'].isna())
+        ]
+        
+        coupures_3 = coupures_df[
+            (coupures_df['capteurID'] == captorId) & 
+            (coupures_df['temperature_coupure_3'] == 1) &
+            (coupures_df['timestamp_fin'].isna())
+        ]
+        
+        coupures_2 = coupures_df[
+            (coupures_df['capteurID'] == captorId) & 
+            (coupures_df['temperature_coupure_2'] == 1) &
             (coupures_df['timestamp_fin'].isna())
         ]
 
-        if len(coupure_en_cours) > 0:
-            # Il y a une coupure en cours
-            if temperature <= 4.0:
-                # La température est redevenue normale, on met à jour la fin de la coupure
-                coupures_df.loc[coupure_en_cours.index, 'timestamp_fin'] = timestamp
-                coupures_df.to_csv('log_coupure.csv', index=False)
-        else:
-            # Pas de coupure en cours
-            if temperature > 4.0:
-                # Nouvelle coupure détectée
-                new_coupure = pd.DataFrame({
-                    'coupureID': [f'COUP_{get_next_coupure_id()}'],
-                    'capteurID': [captorId],
-                    'timestamp_debut': [timestamp],
-                    'timestamp_fin': [None]
-                })
-                coupures_df = pd.concat([coupures_df, new_coupure], ignore_index=True)
-                coupures_df.to_csv('log_coupure.csv', index=False)
+        # Fermer les coupures si la température est redevenue normale
+        if temperature <= 4.0 and len(coupures_4) > 0:
+            coupures_df.loc[coupures_4.index, 'timestamp_fin'] = timestamp
+        
+        if temperature <= 3.0 and len(coupures_3) > 0:
+            coupures_df.loc[coupures_3.index, 'timestamp_fin'] = timestamp
+        
+        if temperature <= 2.0 and len(coupures_2) > 0:
+            coupures_df.loc[coupures_2.index, 'timestamp_fin'] = timestamp
+
+        # Créer de nouvelles coupures pour chaque seuil dépassé
+        if temperature > 4.0 and len(coupures_4) == 0:
+            new_coupure = pd.DataFrame({
+                'coupureID': [f'COUP_{get_next_coupure_id()}'],
+                'capteurID': [captorId],
+                'timestamp_debut': [timestamp],
+                'timestamp_fin': [None],
+                'temperature_coupure_4': [1],
+                'temperature_coupure_3': [0],
+                'temperature_coupure_2': [0]
+            })
+            coupures_df = pd.concat([coupures_df, new_coupure], ignore_index=True)
+
+        if temperature > 3.0 and len(coupures_3) == 0:
+            new_coupure = pd.DataFrame({
+                'coupureID': [f'COUP_{get_next_coupure_id()}'],
+                'capteurID': [captorId],
+                'timestamp_debut': [timestamp],
+                'timestamp_fin': [None],
+                'temperature_coupure_4': [0],
+                'temperature_coupure_3': [1],
+                'temperature_coupure_2': [0]
+            })
+            coupures_df = pd.concat([coupures_df, new_coupure], ignore_index=True)
+
+        if temperature > 2.0 and len(coupures_2) == 0:
+            new_coupure = pd.DataFrame({
+                'coupureID': [f'COUP_{get_next_coupure_id()}'],
+                'capteurID': [captorId],
+                'timestamp_debut': [timestamp],
+                'timestamp_fin': [None],
+                'temperature_coupure_4': [0],
+                'temperature_coupure_3': [0],
+                'temperature_coupure_2': [1]
+            })
+            coupures_df = pd.concat([coupures_df, new_coupure], ignore_index=True)
+
+        # Sauvegarder les modifications
+        coupures_df.to_csv('log_coupure.csv', index=False)
 
         return {"message": "Données traitées avec succès"}
 
@@ -89,19 +136,16 @@ class ColdChainService:
         import pandas as pd
         import os
 
-        # Vérifier d'abord si le capteur a une coupure en cours
+        # Vérifier si le capteur a déjà eu une coupure
         if os.path.exists('log_coupure.csv') and os.path.getsize('log_coupure.csv') > 0:
             coupures_df = pd.read_csv('log_coupure.csv')
-            coupure_en_cours = coupures_df[
-                (coupures_df['capteurID'] == capteurID) & 
-                (coupures_df['timestamp_fin'].isna())
-            ]
-            has_active_coupure = 1 if len(coupure_en_cours) > 0 else 0
+            # Chercher si le capteur existe dans n'importe quelle ligne
+            has_coupure_history = 1 if len(coupures_df[coupures_df['capteurID'] == capteurID]) > 0 else 0
         else:
-            has_active_coupure = 0
+            has_coupure_history = 0
 
         # Lecture de la table de correspondance
-        table = pd.read_excel("./manuel_correspondance.xlsx")
+        table = pd.read_excel("./from_to_pnns_temperatures.xlsx")
 
         # Get food data from API
         food_data = self.get_food_data(barcode)
@@ -109,21 +153,83 @@ class ColdChainService:
         # Extract category from the food data and get the first category if multiple exist
         category = food_data["Catégorie"].split(',')[0].strip()
 
+        print(category)
+
         # Filter the table for matching category and get temperature
-        matching_rows = table[table["catégorie"] == category]
+        matching_rows = table[table["categories"] == category]
         
         # Check if we found any matching categories
         if matching_rows.empty:
             return {
-                "error": "No matching category found",
-                "has_active_coupure": has_active_coupure
+                "error": "No matching category found"
             }
             
-        temperature = matching_rows["TEMPÉRATURE DE CONSERVATION"].iloc[0]
+        # Convert numpy.int64 to Python int
+        temperature = float(matching_rows["temperature_limite"].iloc[0])
+
+        # Vérifier les coupures actives pour le niveau de température approprié
+        if temperature == 4:
+            # Filtrer les coupures pour ce capteur et cette température
+            relevant_coupures = coupures_df[
+                (coupures_df['capteurID'] == capteurID) & 
+                (coupures_df['temperature_coupure_4'] == 1) &
+                (coupures_df['timestamp_fin'].notna())  # Seulement les coupures terminées
+            ]
+            
+            # Vérifier la durée de chaque coupure
+            has_long_coupure = False
+            for _, coupure in relevant_coupures.iterrows():
+                debut = datetime.strptime(coupure['timestamp_debut'], "%Y-%m-%d %H:%M:%S")
+                fin = datetime.strptime(coupure['timestamp_fin'], "%Y-%m-%d %H:%M:%S")
+                duree = (fin - debut).total_seconds() / 60  # Durée en minutes
+                if duree >= 30:
+                    has_long_coupure = True
+                    break
+            
+            has_coupure_history = 1 if has_long_coupure else 0
+
+        elif temperature == 3:
+            relevant_coupures = coupures_df[
+                (coupures_df['capteurID'] == capteurID) & 
+                (coupures_df['temperature_coupure_3'] == 1) &
+                (coupures_df['timestamp_fin'].notna())
+            ]
+            
+            has_long_coupure = False
+            for _, coupure in relevant_coupures.iterrows():
+                debut = datetime.strptime(coupure['timestamp_debut'], "%Y-%m-%d %H:%M:%S")
+                fin = datetime.strptime(coupure['timestamp_fin'], "%Y-%m-%d %H:%M:%S")
+                duree = (fin - debut).total_seconds() / 60
+                if duree >= 30:
+                    has_long_coupure = True
+                    break
+            
+            has_coupure_history = 1 if has_long_coupure else 0
+
+        elif temperature == 2:
+            relevant_coupures = coupures_df[
+                (coupures_df['capteurID'] == capteurID) & 
+                (coupures_df['temperature_coupure_2'] == 1) &
+                (coupures_df['timestamp_fin'].notna())
+            ]
+            
+            has_long_coupure = False
+            for _, coupure in relevant_coupures.iterrows():
+                debut = datetime.strptime(coupure['timestamp_debut'], "%Y-%m-%d %H:%M:%S")
+                fin = datetime.strptime(coupure['timestamp_fin'], "%Y-%m-%d %H:%M:%S")
+                duree = (fin - debut).total_seconds() / 60
+                if duree >= 30:
+                    has_long_coupure = True
+                    break
+            
+            has_coupure_history = 1 if has_long_coupure else 0
+
+        else:
+            has_coupure_history = 0
 
         return {
             "temperature": temperature,
-            "has_active_coupure": has_active_coupure
+            "has_coupure_history": has_coupure_history
         }
 
     @staticmethod  # Add staticmethod decorator since this doesn't use self
