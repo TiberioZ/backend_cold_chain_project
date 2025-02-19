@@ -6,7 +6,6 @@ from routes import cold_chain_router
 app = FastAPI(
     title="cold chain api",
     version="1.0.0",
-    swagger_ui_parameters={"docExpansion": "none"},
 )
 
 app.include_router(cold_chain_router)

@@ -12,3 +12,16 @@ class FoodRequest(BaseModel):
         title="The temperature of the food item",
         example=4.5,
     )
+
+
+class TemparatureRequest(BaseModel):
+    temperature: float = Field(
+        ...,
+        title="The temperature of the food item",
+        example=4.5,
+    )
+    timestamp: str = Field(
+        ...,
+        title="The timestamp of the temperature reading",
+        examples=["710222002"],
+    )
