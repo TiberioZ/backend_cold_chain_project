@@ -10,6 +10,11 @@ class FoodRequest(BaseModel):
 
 
 class TemparatureRequest(BaseModel):
+    captorId: str = Field(
+        ...,
+        title="The captorId of the temperature reading",
+        example="123456789",
+    )
     temperature: float = Field(
         ...,
         title="The temperature of the food item",
