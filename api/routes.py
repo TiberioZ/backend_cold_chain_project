@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from typing import Optional
 
 from api.models import FoodRequest, TemparatureRequest
 from api.services import ColdChainService
@@ -14,5 +15,5 @@ async def post_temperature(request: TemparatureRequest):
 
 
 @cold_chain_router.get("/food")
-async def get_food_advise(request: FoodRequest):
-    return service.get_advise_for_food_item(request.barcode, request.temperature)
+async def get_food_advise(barcode: str):
+    return await service.get_advise_for_food_item(barcode)
