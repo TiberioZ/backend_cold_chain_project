@@ -7,13 +7,18 @@ class FoodRequest(BaseModel):
         title="The barcode of the food item",
         example="123456789",
     )
+    capteurID: str = Field(
+        ...,
+        title="The ID of the temperature sensor",
+        example="FRIDGE_001",
+    )
 
 
 class TemparatureRequest(BaseModel):
     captorId: str = Field(
         ...,
         title="The captorId of the temperature reading",
-        example="123456789",
+        example="FRIDGE_001",
     )
     temperature: float = Field(
         ...,
@@ -23,5 +28,5 @@ class TemparatureRequest(BaseModel):
     timestamp: str = Field(
         ...,
         title="The timestamp of the temperature reading",
-        examples=["710222002"],
+        example="2024-03-19 15:30:00",
     )

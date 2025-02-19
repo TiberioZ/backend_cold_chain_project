@@ -11,9 +11,13 @@ service = ColdChainService()
 
 @cold_chain_router.post("/temperature")
 async def post_temperature(request: TemparatureRequest):
-    return service.post_temperature(request.temperature, request.timestamp)
+    return await service.post_temperature(
+        request.temperature, 
+        request.timestamp,
+        request.captorId
+    )
 
 
 @cold_chain_router.get("/food")
-async def get_food_advise(barcode: str):
-    return await service.get_advise_for_food_item(barcode)
+async def get_food_advise(barcode: str, capteurID: str):
+    return await service.get_advise_for_food_item(barcode, capteurID)
